@@ -357,7 +357,7 @@
         "url": "http://localhost:11434/api/generate",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"llama3.2:3b\",\n  \"prompt\": \"Return JSON only. No markdown.\\n\\nAnalyze this topic for B2B SaaS founder relevance on LinkedIn.\\n\\nTopic: {{$json.title}}\\nSource: {{$json.source}}\\n\\nReturn exactly:\\n{\\n  \\\"worthy\\\": true/false,\\n  \\\"score\\\": 1-10,\\n  \\\"category\\\": \\\"one of: AI/ML, DevTools, Growth, Product, Engineering, Fundraising, Leadership\\\",\\n  \\\"angle\\\": \\\"one sentence contrarian angle for a LinkedIn post\\\"\\n}\",\n  \"stream\": false,\n  \"options\": { \"temperature\": 0.3, \"num_predict\": 120 }\n}",
+        "jsonBody": "={\n  \"model\": \"llama3.2:3b\",\n  \"prompt\": \"Return JSON only. No markdown.\\n\\nAnalyze this topic for B2B SaaS founder relevance AND viral potential on LinkedIn.\\n\\nTopic: {{$json.title}}\\nSource: {{$json.source}}\\n\\nEvaluate virality based on:\\n- Is it contrarian? (challenges popular belief)\\n- Is it relatable? (someone would tag a coworker)\\n- Is it timely? (happening right now in tech)\\n- Can it be explained with a simple real-world analogy?\\n\\nReturn exactly:\\n{\\n  \\\"worthy\\\": true/false,\\n  \\\"score\\\": 1-10,\\n  \\\"virality\\\": 1-10,\\n  \\\"category\\\": \\\"one of: AI/ML, DevTools, Growth, Product, Engineering, Fundraising, Leadership\\\",\\n  \\\"angle\\\": \\\"one sentence contrarian angle\\\",\\n  \\\"analogy_seed\\\": \\\"one word from: plumbing, cooking, farming, sports, construction, parenting, military, restaurants, fishing, carpentry\\\"\\n}\",\n  \"stream\": false,\n  \"options\": { \"temperature\": 0.3, \"num_predict\": 150 }\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -389,8 +389,8 @@
           "conditions": [
             {
               "id": "72541012-5dcb-4bac-9eb5-d79a6184faee",
-              "leftValue": "={{$json.score}}",
-              "rightValue": 5,
+              "leftValue": "={{ (Number($json.score) || 0) + (Number($json.virality) || 0) }}",
+              "rightValue": 10,
               "operator": { "type": "number", "operation": "gt" }
             }
           ],
@@ -411,7 +411,7 @@
         "url": "http://localhost:11434/api/generate",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"qwen2.5:14b\",\n  \"prompt\": \"You are a contrarian B2B SaaS founder writing on LinkedIn. Your posts get 10x engagement because they challenge groupthink.\\n\\nTopic: {{$json.title}}\\nAngle: {{$json.angle || 'Find a surprising take'}}\\nCategory: {{$json.category || 'Tech'}}\\n\\nStyle (pick ONE randomly based on the topic):\\n- Hot take that challenges conventional wisdom\\n- Personal failure story with a hard-earned lesson\\n- Counterintuitive data point that surprises readers\\n- Unpopular opinion backed by first-principles reasoning\\n- 'Here is what nobody tells you about...' format\\n- Bold prediction with a timeline\\n\\nRules:\\n- First line must be a BOLD hook under 10 words that stops the scroll\\n- No hashtags, no emojis, no corporate speak, no filler\\n- Write like you are texting a smart friend not writing a blog\\n- Be SPECIFIC: use numbers, tool names, or concrete examples\\n- End with a provocative question OR a one-line hot take\\n- 150-200 words MAX (shorter = more viral)\\n- Add line breaks between paragraphs for readability\\n- NEVER start with 'I think' or 'In my opinion'\\n- Sound like a real human, not AI\",\n  \"options\": { \"num_ctx\": 32768, \"temperature\": 0.75, \"top_p\": 0.9 },\n  \"stream\": false\n}",
+        "jsonBody": "={\n  \"model\": \"qwen2.5:14b\",\n  \"prompt\": \"You are a seasoned B2B SaaS founder who writes LinkedIn posts that go viral because they feel REAL. Your superpower: drawing unexpected parallels from everyday life, unrelated industries, or blue-collar trades to make a sharp tech/business point.\\n\\nTopic: {{$json.title}}\\nAngle: {{$json.angle || 'Find a surprising take'}}\\nCategory: {{$json.category || 'Tech'}}\\nAnalogy Domain: {{$json.analogy_seed || 'construction'}}\\n\\nVIRALITY FRAMEWORK (use ALL of these):\\n1. ANALOGY HOOK: Start with a simple, grounded real-world observation from the {{$json.analogy_seed || 'construction'}} world. Something a 12-year-old would understand.\\n2. BRIDGE: Draw a parallel line from that analogy to the tech topic. The connection should feel surprising but obvious once stated.\\n3. CONVICTION POINT: Make a strong claim that sounds like it comes from 5+ years of painful experience. Be opinionated. Take a side.\\n4. PROOF: Back it with ONE specific example - a tool name, a metric, a company, a scenario you have seen play out.\\n5. STING: End with a one-liner that makes people screenshot the post.\\n\\nVIRALITY CHECKLIST:\\n- Would someone screenshot this? (if no, rewrite)\\n- Does it challenge a popular belief? (contrarian = comments)\\n- Is there a clear before/after or wrong/right framing? (polarizing = shares)\\n- Can someone tag a coworker with 'this is us'? (relatable = reach)\\n\\nRules:\\n- First line: 8 words max. Punchy. Pattern-interrupt. No questions.\\n- Draw from UNRELATED industries (restaurants, sports, military, farming, construction)\\n- Write like someone who has been burned and learned the hard way\\n- Be SPECIFIC: names, numbers, timelines, tools\\n- No hashtags, no emojis, no corporate jargon, no 'I think', no 'In my experience'\\n- Short paragraphs (1-2 sentences each). White space is your friend.\\n- 150-200 words MAX\\n- End with a statement, not a question. Make it quotable.\\n- Sound like a founder who built and broke things, not a content creator\",\n  \"options\": { \"num_ctx\": 32768, \"temperature\": 0.8, \"top_p\": 0.92 },\n  \"stream\": false\n}",
         "options": { "response": { "response": { "responseFormat": "json" } } }
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -434,7 +434,7 @@
     {
       "parameters": {
         "chatId": "55594604",
-        "text": "={{ \"🚨 <b>New Founder Trend</b>\\n\\n📌 <b>Topic:</b> \" + ($json.title || 'No Title') + \"\\n🌐 <b>Source:</b> \" + ($json.source || 'Unknown') + \"\\n🔥 <b>Score:</b> \" + ($json.score || 0) + \"/10\\n🎯 <b>Category:</b> \" + ($json.category || 'N/A') + \"\\n💡 <b>Angle:</b> \" + ($json.angle || 'N/A') + \"\\n\\n✍️ <b>LinkedIn Post:</b>\\n\" + ($json.response || 'Generation Failed') }}",
+        "text": "={{ \"🚨 <b>New Founder Trend</b>\\n\\n📌 <b>Topic:</b> \" + ($json.title || 'No Title') + \"\\n🌐 <b>Source:</b> \" + ($json.source || 'Unknown') + \"\\n🔥 <b>Relevance:</b> \" + ($json.score || 0) + \"/10\\n⚡ <b>Virality:</b> \" + ($json.virality || 0) + \"/10\\n🎯 <b>Category:</b> \" + ($json.category || 'N/A') + \"\\n💡 <b>Angle:</b> \" + ($json.angle || 'N/A') + \"\\n🔗 <b>Analogy from:</b> \" + ($json.analogy_seed || 'N/A') + \"\\n\\n✍️ <b>LinkedIn Post:</b>\\n\" + ($json.response || 'Generation Failed') }}",
         "additionalFields": { "parse_mode": "HTML" }
       },
       "type": "n8n-nodes-base.telegram",
