@@ -1,0 +1,647 @@
+{
+  "name": "Linkedin Post generator v3 (Fixed)",
+  "nodes": [
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 5 }]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-800, -400],
+      "id": "d8703fa5-1b09-4ee5-b210-117144b42020",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const queries = [\n  \"AI+agents+stars:>50&sort=updated&order=desc\",\n  \"developer+tools+CLI+stars:>100&sort=updated&order=desc\",\n  \"LLM+inference+optimization+stars:>50&sort=updated&order=desc\",\n  \"SaaS+boilerplate+starter+stars:>80&sort=updated&order=desc\",\n  \"automation+workflow+pipeline+stars:>100&sort=updated&order=desc\",\n  \"vector+database+embedding+stars:>50&sort=updated&order=desc\",\n  \"serverless+edge+function+stars:>80&sort=updated&order=desc\",\n  \"RAG+retrieval+augmented+stars:>50&sort=updated&order=desc\",\n  \"observability+monitoring+tracing+stars:>80&sort=updated&order=desc\"\n];\nconst pick = queries[Math.floor(Math.random() * queries.length)];\nreturn [{ json: { query: pick } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, -700],
+      "id": "a1b2c3d4-0001-4000-a000-000000000001",
+      "name": "Randomize GitHub Query"
+    },
+
+    {
+      "parameters": {
+        "url": "=https://api.github.com/search/repositories?q={{$json.query}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/vnd.github+json" },
+            { "name": "User-Agent", "value": "n8n-trend-bot/1.0" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-100, -700],
+      "id": "b0ade993-17d3-4b67-9a18-90f74b03d7ea",
+      "name": "GitHub Trending"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().flatMap(item => {\n  const repos = (item.json.items || []).slice(0, 10);\n  return repos.map(repo => ({\n    json: {\n      title: `Trending: ${repo.name} (${repo.language || 'Multi'}) - ${(repo.description || '').slice(0, 80)}`,\n      source: \"GitHub\",\n      url: repo.html_url || '',\n      score: Number(repo.stargazers_count || 0),\n      comments: Number(repo.forks_count || 0),\n      created_at: repo.pushed_at || new Date().toISOString(),\n      raw_text: repo.description || ''\n    }\n  }));\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, -700],
+      "id": "76cc0052-14d2-498f-b23a-6a65759f0cfc",
+      "name": "Normalize GitHub"
+    },
+
+    {
+      "parameters": {
+        "url": "https://hacker-news.firebaseio.com/v0/topstories.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-400, -400],
+      "id": "635e5abd-19ea-4629-9cc5-6de3531d5d22",
+      "name": "HN Top Stories"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ids = Object.values(items[0].json);\nreturn ids.slice(0, 8).map(id => ({ json: { id } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-100, -400],
+      "id": "e0ab22ee-fc53-40ed-b82e-dddb46f62b8d",
+      "name": "Select HN IDs"
+    },
+    {
+      "parameters": {
+        "url": "=https://hacker-news.firebaseio.com/v0/item/{{$json.id}}.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [200, -400],
+      "id": "c38ba05d-c78f-4512-baf9-4cc2ff7fe6af",
+      "name": "Fetch HN Item",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    title: item.json.title || '',\n    source: 'HackerNews',\n    url: item.json.url || `https://news.ycombinator.com/item?id=${item.json.id}`,\n    score: Number(item.json.score || 0),\n    comments: Number(item.json.descendants || 0),\n    raw_text: item.json.text || '',\n    created_at: item.json.time ? new Date(item.json.time * 1000).toISOString() : new Date().toISOString()\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, -400],
+      "id": "d08b5794-b63f-46db-9a8a-f48aa0174797",
+      "name": "Normalize HN"
+    },
+
+    {
+      "parameters": {
+        "url": "https://dev.to/api/articles?top=7&per_page=10",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-400, -100],
+      "id": "4189061c-bc95-4975-913b-85124cf8b02a",
+      "name": "Fetch DevTo"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    title: item.json.title || '',\n    source: 'DevTo',\n    url: item.json.url || '',\n    score: Number(item.json.public_reactions_count || 0),\n    comments: Number(item.json.comments_count || 0),\n    raw_text: item.json.description || '',\n    created_at: item.json.published_at || new Date().toISOString()\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-100, -100],
+      "id": "75f7fdec-51a9-4d1d-9ce5-375a3376dbc4",
+      "name": "Normalize DevTo"
+    },
+
+    {
+      "parameters": {
+        "url": "https://techcrunch.com/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [-400, 200],
+      "id": "4d37bc10-ba0e-4d9f-835c-8dfa54e80092",
+      "name": "RSS TechCrunch"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    title: item.json.title || '',\n    source: 'TechCrunch',\n    url: item.json.link || '',\n    score: 150,\n    comments: 0,\n    raw_text: (item.json.contentSnippet || item.json.content || '').slice(0, 200),\n    created_at: item.json.pubDate || new Date().toISOString()\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-100, 200],
+      "id": "9a3f85fa-c81e-4d2f-95f7-e3f56d267ce3",
+      "name": "Normalize TechCrunch"
+    },
+
+    {
+      "parameters": {
+        "url": "https://venturebeat.com/feed/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [-400, 500],
+      "id": "551fc6b1-e686-4d98-bc86-6d33cd969de2",
+      "name": "Fetch VentureBeat"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    title: item.json.title || '',\n    source: 'VentureBeat',\n    url: item.json.link || '',\n    score: 120,\n    comments: 0,\n    raw_text: (item.json.contentSnippet || item.json.content || '').slice(0, 200),\n    created_at: item.json.pubDate || new Date().toISOString()\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-100, 500],
+      "id": "fd0ffd0c-42bb-455b-9bba-210fe6ae4ccc",
+      "name": "Normalize VentureBeat"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const subreddits = [\n  ['SaaS', 'startups', 'LocalLLaMA', 'singularity'],\n  ['Entrepreneur', 'artificial', 'MachineLearning', 'devops'],\n  ['programming', 'technology', 'ProductManagement', 'webdev']\n];\nconst pick = subreddits[Math.floor(Math.random() * subreddits.length)];\nreturn pick.map(s => ({ json: { subreddit: s } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, 800],
+      "id": "8dab15b3-674a-4b61-a97a-ca0ffd055695",
+      "name": "Randomize Subreddits"
+    },
+    {
+      "parameters": {
+        "url": "={{`https://api.reddit.com/r/${$json.subreddit}/hot?limit=5`}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "User-Agent", "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-100, 800],
+      "id": "8b1e135e-1eaa-4b98-b956-063b6a362e18",
+      "name": "Fetch Reddit Feeds",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\nfor (const item of $input.all()) {\n  const posts = item.json.data?.children || [];\n  for (const post of posts) {\n    const p = post.data;\n    if (!p || !p.title) continue;\n    output.push({\n      json: {\n        title: p.title,\n        source: 'Reddit',\n        url: `https://reddit.com${p.permalink || ''}`,\n        score: Number(p.score || 0),\n        comments: Number(p.num_comments || 0),\n        raw_text: (p.selftext || '').slice(0, 200),\n        subreddit: p.subreddit || '',\n        created_at: new Date((p.created_utc || 0) * 1000).toISOString()\n      }\n    });\n  }\n}\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 800],
+      "id": "641e2a39-828a-4bb2-8ed5-8a8419baa042",
+      "name": "Extract Reddit Posts"
+    },
+
+    {
+      "parameters": {
+        "numberInputs": 6
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [800, -100],
+      "id": "3ec4c99f-c4b7-4cb5-8f77-e1ad296aa377",
+      "name": "Merge All Trends"
+    },
+    {
+      "parameters": {
+        "jsCode": "const weights = { HackerNews: 1.5, GitHub: 1.4, TechCrunch: 1.3, VentureBeat: 1.2, DevTo: 1.1, Reddit: 0.9 };\nreturn items.map(item => {\n  const w = weights[item.json.source] || 1;\n  item.json.source_weight = w;\n  item.json.weighted_score = (item.json.score || 0) * w;\n  return item;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, -100],
+      "id": "f90e78fa-7879-4015-9619-5ed8e8332153",
+      "name": "Add Source Weight"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({\n  json: {\n    ...item.json,\n    score: Number(item.json.score || 0),\n    comments: Number(item.json.comments || 0)\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, -100],
+      "id": "ddd9cf68-5560-498e-986b-34854fedbd48",
+      "name": "Normalize Numeric Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.filter(item => {\n  const score = Number(item.json.score || 0);\n  const comments = Number(item.json.comments || 0);\n  return score > 15 || comments > 3;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1700, -100],
+      "id": "ed14605b-4c38-47a7-8426-aff09b645043",
+      "name": "Filter Quality Posts"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const processed = items.map(item => {\n  const score = Number(item.json.score || 0);\n  const comments = Number(item.json.comments || 0);\n  const weight = (score * 0.7) + (comments * 1.5);\n  return { json: { ...item.json, weight } };\n});\nconst topTrends = processed.sort((a, b) => b.json.weight - a.json.weight).slice(0, 15);\nconst shuffled = topTrends.sort(() => 0.5 - Math.random());\nreturn shuffled.slice(0, 3);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, -100],
+      "id": "75305c64-cb5d-4a6a-822f-eee0c3a46b04",
+      "name": "Pick Top 3 Random"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\nreturn $input.all().filter(item => {\n  if (!item.json.title) return false;\n  const norm = item.json.title.toLowerCase().replace(/[^\\\\w\\\\s]/g, '').trim();\n  if (seen.has(norm)) return false;\n  seen.add(norm);\n  return true;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, -100],
+      "id": "548efc29-9a44-4a81-a89c-2f1581c2d0eb",
+      "name": "Remove Duplicate Topics"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.filter(item => item.json.title && item.json.title.length > 5).map(item => ({\n  json: {\n    ...item.json,\n    title: (item.json.title || '').slice(0, 100),\n    raw_text: ''\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2600, -100],
+      "id": "0731a68e-8161-433e-9046-28c8d8095723",
+      "name": "Compress and Validate"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"nomic-embed-text\",\n  \"prompt\": \"{{ $json.title }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2900, -100],
+      "id": "10b7d57b-659c-4451-b39b-2f9f8ceb23e4",
+      "name": "Generate Title Embedding"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:6333/collections/trends/points/search",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"vector\": {{ JSON.stringify($json.embedding) }},\n  \"limit\": 1,\n  \"with_payload\": true\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3200, -100],
+      "id": "a4bf833e-d208-479e-945b-031b94087554",
+      "name": "Query Vector DB"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bdef1789-a5ab-462f-9d5e-fb1fec63d048",
+              "leftValue": "={{ Number($json.result?.[0]?.score || 0) }}",
+              "rightValue": 0.92,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [3500, -100],
+      "id": "2800f918-d8b3-4c7b-ab12-2dd9b16cb6d2",
+      "name": "Is Duplicate?"
+    },
+
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://localhost:6333/collections/trends/points",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"points\": [\n    {\n      \"id\": {{ Math.floor(Math.random() * 2147483647) }},\n      \"vector\": {{ JSON.stringify($('Generate Title Embedding').item.json.embedding) }},\n      \"payload\": {\n        \"title\": {{ JSON.stringify($json.title || '') }},\n        \"source\": {{ JSON.stringify($json.source || '') }},\n        \"created_at\": \"{{ new Date().toISOString() }}\"\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3800, -300],
+      "id": "e1d88e59-b1bd-417c-a1a4-31e3bca106c8",
+      "name": "Store Vector"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3.2:3b\",\n  \"prompt\": \"Return JSON only. No markdown.\\n\\nAnalyze this topic for B2B SaaS founder relevance on LinkedIn.\\n\\nTopic: {{$json.title}}\\nSource: {{$json.source}}\\n\\nReturn exactly:\\n{\\n  \\\"worthy\\\": true/false,\\n  \\\"score\\\": 1-10,\\n  \\\"category\\\": \\\"one of: AI/ML, DevTools, Growth, Product, Engineering, Fundraising, Leadership\\\",\\n  \\\"angle\\\": \\\"one sentence contrarian angle for a LinkedIn post\\\"\\n}\",\n  \"stream\": false,\n  \"options\": { \"temperature\": 0.3, \"num_predict\": 120 }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [4100, -300],
+      "id": "e047aad6-79c4-4a93-8a80-d71abb6ba1ad",
+      "name": "AI Trend Scoring"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  try {\n    const raw = (item.json.response || '').replace(/```json/g, '').replace(/```/g, '').trim();\n    const parsed = JSON.parse(raw);\n    return { json: { ...item.json, ...parsed } };\n  } catch (e) {\n    return { json: { ...item.json, worthy: true, score: 5, category: 'General', angle: 'Unique perspective needed' } };\n  }\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4400, -300],
+      "id": "b5b8c43a-f26a-4229-b002-6c201384d96a",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "72541012-5dcb-4bac-9eb5-d79a6184faee",
+              "leftValue": "={{$json.score}}",
+              "rightValue": 5,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [4700, -300],
+      "id": "b2214d47-0a6c-4034-8048-baa196c569b0",
+      "name": "High Potential?"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"qwen2.5:14b\",\n  \"prompt\": \"You are a contrarian B2B SaaS founder writing on LinkedIn. Your posts get 10x engagement because they challenge groupthink.\\n\\nTopic: {{$json.title}}\\nAngle: {{$json.angle || 'Find a surprising take'}}\\nCategory: {{$json.category || 'Tech'}}\\n\\nStyle (pick ONE randomly based on the topic):\\n- Hot take that challenges conventional wisdom\\n- Personal failure story with a hard-earned lesson\\n- Counterintuitive data point that surprises readers\\n- Unpopular opinion backed by first-principles reasoning\\n- 'Here is what nobody tells you about...' format\\n- Bold prediction with a timeline\\n\\nRules:\\n- First line must be a BOLD hook under 10 words that stops the scroll\\n- No hashtags, no emojis, no corporate speak, no filler\\n- Write like you are texting a smart friend not writing a blog\\n- Be SPECIFIC: use numbers, tool names, or concrete examples\\n- End with a provocative question OR a one-line hot take\\n- 150-200 words MAX (shorter = more viral)\\n- Add line breaks between paragraphs for readability\\n- NEVER start with 'I think' or 'In my opinion'\\n- Sound like a real human, not AI\",\n  \"options\": { \"num_ctx\": 32768, \"temperature\": 0.75, \"top_p\": 0.9 },\n  \"stream\": false\n}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [5000, -300],
+      "id": "138edcee-d8f9-478b-80f6-42bc4bfd6d16",
+      "name": "Generate LinkedIn Post"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  item.json.response = (item.json.response || '').trim().slice(0, 3500);\n  return item;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5300, -300],
+      "id": "fa62ba36-42e1-4fbf-a479-2560c5356a8c",
+      "name": "Finalize Post"
+    },
+
+    {
+      "parameters": {
+        "chatId": "55594604",
+        "text": "={{ \"🚨 <b>New Founder Trend</b>\\n\\n📌 <b>Topic:</b> \" + ($json.title || 'No Title') + \"\\n🌐 <b>Source:</b> \" + ($json.source || 'Unknown') + \"\\n🔥 <b>Score:</b> \" + ($json.score || 0) + \"/10\\n🎯 <b>Category:</b> \" + ($json.category || 'N/A') + \"\\n💡 <b>Angle:</b> \" + ($json.angle || 'N/A') + \"\\n\\n✍️ <b>LinkedIn Post:</b>\\n\" + ($json.response || 'Generation Failed') }}",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [5600, -300],
+      "id": "6487665f-107d-4571-bec5-2324d32f2963",
+      "name": "Send to Telegram",
+      "webhookId": "7872e03b-176d-4099-99e3-a7d299d4f8c7",
+      "retryOnFail": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "EQmBecX3IrlNPU9q",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          { "node": "Randomize GitHub Query", "type": "main", "index": 0 },
+          { "node": "HN Top Stories", "type": "main", "index": 0 },
+          { "node": "Fetch DevTo", "type": "main", "index": 0 },
+          { "node": "RSS TechCrunch", "type": "main", "index": 0 },
+          { "node": "Fetch VentureBeat", "type": "main", "index": 0 },
+          { "node": "Randomize Subreddits", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Randomize GitHub Query": {
+      "main": [
+        [{ "node": "GitHub Trending", "type": "main", "index": 0 }]
+      ]
+    },
+    "GitHub Trending": {
+      "main": [
+        [{ "node": "Normalize GitHub", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize GitHub": {
+      "main": [
+        [{ "node": "Merge All Trends", "type": "main", "index": 0 }]
+      ]
+    },
+    "HN Top Stories": {
+      "main": [
+        [{ "node": "Select HN IDs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Select HN IDs": {
+      "main": [
+        [{ "node": "Fetch HN Item", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch HN Item": {
+      "main": [
+        [{ "node": "Normalize HN", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize HN": {
+      "main": [
+        [{ "node": "Merge All Trends", "type": "main", "index": 1 }]
+      ]
+    },
+    "Fetch DevTo": {
+      "main": [
+        [{ "node": "Normalize DevTo", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize DevTo": {
+      "main": [
+        [{ "node": "Merge All Trends", "type": "main", "index": 2 }]
+      ]
+    },
+
+    "RSS TechCrunch": {
+      "main": [
+        [{ "node": "Normalize TechCrunch", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize TechCrunch": {
+      "main": [
+        [{ "node": "Merge All Trends", "type": "main", "index": 3 }]
+      ]
+    },
+    "Fetch VentureBeat": {
+      "main": [
+        [{ "node": "Normalize VentureBeat", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize VentureBeat": {
+      "main": [
+        [{ "node": "Merge All Trends", "type": "main", "index": 4 }]
+      ]
+    },
+    "Randomize Subreddits": {
+      "main": [
+        [{ "node": "Fetch Reddit Feeds", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Reddit Feeds": {
+      "main": [
+        [{ "node": "Extract Reddit Posts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Reddit Posts": {
+      "main": [
+        [{ "node": "Merge All Trends", "type": "main", "index": 5 }]
+      ]
+    },
+    "Merge All Trends": {
+      "main": [
+        [{ "node": "Add Source Weight", "type": "main", "index": 0 }]
+      ]
+    },
+    "Add Source Weight": {
+      "main": [
+        [{ "node": "Normalize Numeric Fields", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Numeric Fields": {
+      "main": [
+        [{ "node": "Filter Quality Posts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Quality Posts": {
+      "main": [
+        [{ "node": "Pick Top 3 Random", "type": "main", "index": 0 }]
+      ]
+    },
+
+    "Pick Top 3 Random": {
+      "main": [
+        [{ "node": "Remove Duplicate Topics", "type": "main", "index": 0 }]
+      ]
+    },
+    "Remove Duplicate Topics": {
+      "main": [
+        [{ "node": "Compress and Validate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Compress and Validate": {
+      "main": [
+        [{ "node": "Generate Title Embedding", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Title Embedding": {
+      "main": [
+        [{ "node": "Query Vector DB", "type": "main", "index": 0 }]
+      ]
+    },
+    "Query Vector DB": {
+      "main": [
+        [{ "node": "Is Duplicate?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [],
+        [{ "node": "Store Vector", "type": "main", "index": 0 }]
+      ]
+    },
+    "Store Vector": {
+      "main": [
+        [{ "node": "AI Trend Scoring", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Trend Scoring": {
+      "main": [
+        [{ "node": "Parse AI Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [{ "node": "High Potential?", "type": "main", "index": 0 }]
+      ]
+    },
+    "High Potential?": {
+      "main": [
+        [{ "node": "Generate LinkedIn Post", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Generate LinkedIn Post": {
+      "main": [
+        [{ "node": "Finalize Post", "type": "main", "index": 0 }]
+      ]
+    },
+    "Finalize Post": {
+      "main": [
+        [{ "node": "Send to Telegram", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fixed-v3-unique-viral",
+  "meta": {
+    "instanceId": "6f02f8f18d6b1e78a92c9a0b8bc8b06517795743e263573d3e82c403de13689c"
+  },
+  "id": "IThdHtzYUnMNGl9w",
+  "tags": []
+}
