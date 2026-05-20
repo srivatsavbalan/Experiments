@@ -503,7 +503,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Get all previously posted titles from the sheet\nconst sheetData = $('Read Posted Titles').all();\nconst postedTitles = new Set(\n  sheetData.map(item => \n    (item.json.Title || '').toLowerCase().replace(/[^\\w\\s]/g, '').trim()\n  ).filter(t => t.length > 0)\n);\n\n// Filter out any items whose title matches a previously posted one\nreturn $input.all().filter(item => {\n  const norm = (item.json.title || '').toLowerCase().replace(/[^\\w\\s]/g, '').trim();\n  if (postedTitles.has(norm)) {\n    return false; // Already posted this exact topic before\n  }\n  return true;\n});"
+        "jsCode": "// Input comes from Read Posted Titles (the sheet data flows through here)\n// We reference Compress and Validate to get the original trend items\nconst sheetRows = $input.all();\nconst postedTitles = new Set(\n  sheetRows.map(item => \n    (item.json.Title || item.json.title || '').toLowerCase().replace(/[^\\w\\s]/g, '').trim()\n  ).filter(t => t.length > 0)\n);\n\n// Get original items from upstream node\nconst originalItems = $('Compress and Validate').all();\n\n// Filter out any items whose title was already posted\nreturn originalItems.filter(item => {\n  const norm = (item.json.title || '').toLowerCase().replace(/[^\\w\\s]/g, '').trim();\n  return !postedTitles.has(norm);\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -749,8 +749,7 @@
     },
     "Compress and Validate": {
       "main": [
-        [{ "node": "Read Posted Titles", "type": "main", "index": 0 },
-         { "node": "Filter Already Posted", "type": "main", "index": 0 }]
+        [{ "node": "Read Posted Titles", "type": "main", "index": 0 }]
       ]
     },
     "Read Posted Titles": {
