@@ -451,6 +451,66 @@
         }
       }
     },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_SHEET_ID_HERE" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Sheet1" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Title": "={{ $json.title || '' }}",
+            "Source": "={{ $json.source || '' }}",
+            "Category": "={{ $json.category || '' }}",
+            "Angle": "={{ $json.angle || '' }}",
+            "Score": "={{ $json.score || 0 }}",
+            "Date": "={{ new Date().toISOString().split('T')[0] }}",
+            "Post_Preview": "={{ ($json.response || '').slice(0, 100) }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [5900, -300],
+      "id": "sh33t001-log1-4000-c000-000000000001",
+      "name": "Log to Google Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_SHEET_ID_HERE" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Sheet1" },
+        "options": { "range": "A:A" }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2750, -400],
+      "id": "sh33t001-chk1-4000-c000-000000000002",
+      "name": "Read Posted Titles",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all previously posted titles from the sheet\nconst sheetData = $('Read Posted Titles').all();\nconst postedTitles = new Set(\n  sheetData.map(item => \n    (item.json.Title || '').toLowerCase().replace(/[^\\w\\s]/g, '').trim()\n  ).filter(t => t.length > 0)\n);\n\n// Filter out any items whose title matches a previously posted one\nreturn $input.all().filter(item => {\n  const norm = (item.json.title || '').toLowerCase().replace(/[^\\w\\s]/g, '').trim();\n  if (postedTitles.has(norm)) {\n    return false; // Already posted this exact topic before\n  }\n  return true;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2750, -100],
+      "id": "sh33t001-flt1-4000-c000-000000000003",
+      "name": "Filter Already Posted"
+    },
 
     {
       "parameters": {
@@ -689,6 +749,17 @@
     },
     "Compress and Validate": {
       "main": [
+        [{ "node": "Read Posted Titles", "type": "main", "index": 0 },
+         { "node": "Filter Already Posted", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Posted Titles": {
+      "main": [
+        [{ "node": "Filter Already Posted", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Already Posted": {
+      "main": [
         [{ "node": "Generate Title Embedding", "type": "main", "index": 0 }]
       ]
     },
@@ -736,7 +807,8 @@
     },
     "Finalize Post": {
       "main": [
-        [{ "node": "Send to Telegram", "type": "main", "index": 0 }]
+        [{ "node": "Send to Telegram", "type": "main", "index": 0 },
+         { "node": "Log to Google Sheet", "type": "main", "index": 0 }]
       ]
     },
     "Weekly Cleanup Trigger": {
