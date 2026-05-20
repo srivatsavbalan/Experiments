@@ -203,13 +203,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const processed = items.map(item => {\n  const score = Number(item.json.score || 0);\n  const comments = Number(item.json.comments || 0);\n  const weight = (score * 0.7) + (comments * 1.5);\n  return { json: { ...item.json, weight } };\n});\nconst topTrends = processed.sort((a, b) => b.json.weight - a.json.weight).slice(0, 15);\nconst shuffled = topTrends.sort(() => 0.5 - Math.random());\nreturn shuffled.slice(0, 3);"
+        "jsCode": "const processed = items.map(item => {\n  const score = Number(item.json.score || 0);\n  const comments = Number(item.json.comments || 0);\n  const weight = (score * 0.7) + (comments * 1.5);\n  return { json: { ...item.json, weight } };\n});\nconst topTrends = processed.sort((a, b) => b.json.weight - a.json.weight).slice(0, 15);\nconst shuffled = topTrends.sort(() => 0.5 - Math.random());\nreturn shuffled.slice(0, 1);"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1248, 960],
       "id": "adb75520-3b87-4ce1-ae44-e76ddd143aed",
-      "name": "Pick Top 3 Random"
+      "name": "Pick Top 1 Random"
     },
     {
       "parameters": {
@@ -620,8 +620,8 @@
     "Merge All Trends": { "main": [[{ "node": "Add Source Weight", "type": "main", "index": 0 }]] },
     "Add Source Weight": { "main": [[{ "node": "Normalize Numeric Fields", "type": "main", "index": 0 }]] },
     "Normalize Numeric Fields": { "main": [[{ "node": "Filter Quality Posts", "type": "main", "index": 0 }]] },
-    "Filter Quality Posts": { "main": [[{ "node": "Pick Top 3 Random", "type": "main", "index": 0 }]] },
-    "Pick Top 3 Random": { "main": [[{ "node": "Remove Duplicate Topics", "type": "main", "index": 0 }]] },
+    "Filter Quality Posts": { "main": [[{ "node": "Pick Top 1 Random", "type": "main", "index": 0 }]] },
+    "Pick Top 1 Random": { "main": [[{ "node": "Remove Duplicate Topics", "type": "main", "index": 0 }]] },
     "Remove Duplicate Topics": { "main": [[{ "node": "Compress and Validate", "type": "main", "index": 0 }]] },
     "Compress and Validate": { "main": [[{ "node": "Read Posted Titles", "type": "main", "index": 0 }]] },
     "Read Posted Titles": { "main": [[{ "node": "Filter Already Posted", "type": "main", "index": 0 }]] },
