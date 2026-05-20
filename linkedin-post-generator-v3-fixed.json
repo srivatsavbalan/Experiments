@@ -450,6 +450,114 @@
           "name": "Telegram account"
         }
       }
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "days", "daysInterval": 7 }]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-800, 1200],
+      "id": "c1eanup0-sch1-4000-b000-000000000001",
+      "name": "Weekly Cleanup Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate the cutoff date: keep only last 21 days of vectors\nconst DAYS_TO_KEEP = 21;\nconst cutoff = new Date(Date.now() - DAYS_TO_KEEP * 24 * 60 * 60 * 1000).toISOString();\n\nreturn [{ json: { cutoff_date: cutoff, days_to_keep: DAYS_TO_KEEP } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, 1200],
+      "id": "c1eanup0-calc-4000-b000-000000000002",
+      "name": "Calculate Cutoff Date"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:6333/collections/trends/points/scroll",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filter\": {\n    \"must\": [\n      {\n        \"key\": \"created_at\",\n        \"range\": { \"lt\": \"{{ $json.cutoff_date }}\" }\n      }\n    ]\n  },\n  \"limit\": 100,\n  \"with_payload\": true,\n  \"with_vector\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-100, 1200],
+      "id": "c1eanup0-scrl-4000-b000-000000000003",
+      "name": "Find Old Vectors"
+    },
+    {
+      "parameters": {
+        "jsCode": "const points = $json.result?.points || [];\n\nif (points.length === 0) {\n  return [{ json: { message: 'No old vectors to clean', deleted_count: 0, archived: [] } }];\n}\n\n// Archive: keep lightweight record of what was posted (title + category)\nconst archived = points.map(p => ({\n  title: (p.payload?.title || '').slice(0, 60),\n  source: p.payload?.source || '',\n  created_at: p.payload?.created_at || ''\n}));\n\n// Collect IDs to delete\nconst idsToDelete = points.map(p => p.id);\n\nreturn [{ json: { ids_to_delete: idsToDelete, deleted_count: idsToDelete.length, archived } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 1200],
+      "id": "c1eanup0-arch-4000-b000-000000000004",
+      "name": "Archive & Collect IDs"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cleanup-cond-001",
+              "leftValue": "={{$json.deleted_count}}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [500, 1200],
+      "id": "c1eanup0-ifgt-4000-b000-000000000005",
+      "name": "Has Old Vectors?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:6333/collections/trends/points/delete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"points\": {{ JSON.stringify($json.ids_to_delete) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [800, 1100],
+      "id": "c1eanup0-del1-4000-b000-000000000006",
+      "name": "Delete Old Vectors"
+    },
+    {
+      "parameters": {
+        "chatId": "55594604",
+        "text": "={{ \"🧹 <b>Weekly Cleanup Done</b>\\n\\n🗑️ Removed \" + $json.deleted_count + \" vectors older than 21 days\\n📋 Archived titles preserved for reference\\n\\n✅ Dedup DB refreshed - fresh topics can flow again!\" }}",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1100, 1100],
+      "id": "c1eanup0-tgm1-4000-b000-000000000007",
+      "name": "Notify Cleanup Done",
+      "credentials": {
+        "telegramApi": {
+          "id": "EQmBecX3IrlNPU9q",
+          "name": "Telegram account"
+        }
+      }
     }
   ],
 
@@ -630,6 +738,37 @@
       "main": [
         [{ "node": "Send to Telegram", "type": "main", "index": 0 }]
       ]
+    },
+    "Weekly Cleanup Trigger": {
+      "main": [
+        [{ "node": "Calculate Cutoff Date", "type": "main", "index": 0 }]
+      ]
+    },
+    "Calculate Cutoff Date": {
+      "main": [
+        [{ "node": "Find Old Vectors", "type": "main", "index": 0 }]
+      ]
+    },
+    "Find Old Vectors": {
+      "main": [
+        [{ "node": "Archive & Collect IDs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Archive & Collect IDs": {
+      "main": [
+        [{ "node": "Has Old Vectors?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Old Vectors?": {
+      "main": [
+        [{ "node": "Delete Old Vectors", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Delete Old Vectors": {
+      "main": [
+        [{ "node": "Notify Cleanup Done", "type": "main", "index": 0 }]
+      ]
     }
   },
 
@@ -638,7 +777,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "fixed-v3-unique-viral",
+  "versionId": "fixed-v3-unique-viral-v2",
   "meta": {
     "instanceId": "6f02f8f18d6b1e78a92c9a0b8bc8b06517795743e263573d3e82c403de13689c"
   },
